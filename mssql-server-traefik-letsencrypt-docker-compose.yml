@@ -94,7 +94,7 @@ services:
       - "--entryPoints.ping.address=:8082"
       - "--entryPoints.web.address=:80"
       - "--entryPoints.websecure.address=:443"
-      - "--entryPoints.sql.address=:${MSSQL_PORT}"
+      - "--entryPoints.sql.address=:1433"
       - "--providers.docker=true"
       - "--providers.docker.endpoint=unix:///var/run/docker.sock"
       - "--providers.docker.exposedByDefault=false"
@@ -111,7 +111,7 @@ services:
     networks:
       - traefik-network
     ports:
-      - "${MSSQL_PORT}:${MSSQL_PORT}"
+      - "1433:1433"
       - "80:80"
       - "443:443"
     healthcheck:
