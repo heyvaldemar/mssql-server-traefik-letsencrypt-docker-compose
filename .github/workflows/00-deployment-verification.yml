@@ -13,12 +13,12 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      NETWORK_ONE: mssql-network
+      NETWORK_ONE: mssql-server-network
       NETWORK_TWO: traefik-network
       DOCKER_COMPOSE_FILE: mssql-server-traefik-letsencrypt-docker-compose.yml
       APP_HOSTNAME: mssql.heyvaldemar.net
-      APP_TRAEFIK_HOSTNAME: traefik.romm.heyvaldemar.net
-      COMPOSE_PROJECT_NAME: romm
+      APP_TRAEFIK_HOSTNAME: traefik.mssql.heyvaldemar.net
+      COMPOSE_PROJECT_NAME: mssql
 
     steps:
       - name: Checkout repository
