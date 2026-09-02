@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _(no unreleased changes yet)_
 
+## [1.3.0] - 2026-09-02
+
+### Added
+
+- **A `backups` service** — this template persisted `/var/opt/mssql` and
+  called that a day; now a sidecar from the same image runs `BACKUP
+  DATABASE ... WITH CHECKSUM` for `master`, `msdb`, and every online
+  user database on a loop, verifies each file with `RESTORE VERIFYONLY`,
+  logs `Database backup OK: <file> (<bytes> bytes)` or `FAILED` per
+  database (a failed file is kept as `<file>.failed`), and prunes only
+  its own files. Backups land in the `mssql-server-backups` volume,
+  shared with the server. Schedule knobs (`MSSQL_BACKUP_INIT_SLEEP`,
+  `MSSQL_BACKUP_INTERVAL`, `MSSQL_BACKUP_PRUNE_DAYS`, path and name)
+  have defaults listed in `.env.example`. No `COMPRESSION`, which
+  Express does not support.
+- **`mssql-restore-database.sh`** — interactive restore of a user
+  database from a selected `.bak` (single-user mode, `RESTORE ... WITH
+  REPLACE`, back to multi-user). System databases are refused with a
+  pointer to Microsoft's procedure.
+- CI waits for the first backup cycle and runs `RESTORE VERIFYONLY`
+  itself on the newest file.
+
 ## [1.2.0] - 2026-09-02
 
 ### Added
@@ -81,7 +103,8 @@ in [keycloak-traefik-letsencrypt-docker-compose](https://github.com/heyvaldemar/
   engine healthcheck, and queries through the Traefik TCP entrypoint.
 - `.env.example` with generation commands; `.gitignore` for `.env`.
 
-[Unreleased]: https://github.com/heyvaldemar/mssql-server-traefik-letsencrypt-docker-compose/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/heyvaldemar/mssql-server-traefik-letsencrypt-docker-compose/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/heyvaldemar/mssql-server-traefik-letsencrypt-docker-compose/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/heyvaldemar/mssql-server-traefik-letsencrypt-docker-compose/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/heyvaldemar/mssql-server-traefik-letsencrypt-docker-compose/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/heyvaldemar/mssql-server-traefik-letsencrypt-docker-compose/releases/tag/v1.0.0

@@ -72,7 +72,7 @@ The image is published for `linux/amd64` only and the compose file declares that
 - [ ] **Do not expose 1433 to the internet.** SQL Server's port is scanned constantly and `sa` is the most brute-forced account name in existence. Bind the port to a private interface, firewall it to known client IPs, or reach it over VPN/SSH tunnel.
 - [ ] **Strong `sa` password, then stop using `sa`.** Create named logins with the minimum roles your applications need and disable `sa` (`ALTER LOGIN sa DISABLE`).
 - [ ] **Check your licensing.** `MSSQL_PID=Developer` is free but licensed for development only. Production needs Express (limits apply), a paid edition, or a product key.
-- [ ] **Back up your databases.** This template persists `/var/opt/mssql` in a named volume, which is not a backup. Schedule `BACKUP DATABASE` to a path you replicate off-host.
+- [ ] **Replicate backups off-host.** The `backups` service writes verified `.bak` files into the `mssql-server-backups` volume on the same host — bind-mount it to a path your off-host backup solution covers.
 - [ ] **Plan engine upgrades deliberately.** Moving to SQL Server 2025 upgrades database files one-way on first attach. Take full backups first, test the restore on the new engine, then change the pin.
 - [ ] **Lock down the Traefik dashboard.** Basic auth is basic. Consider Traefik's `IPAllowList` middleware or not exposing the dashboard publicly at all.
 
@@ -99,6 +99,25 @@ This is deliberately a host-side script and not a container in the stack: an in-
 ## Resource limits
 
 Every service carries memory and CPU limits plus reservations as compose-level defaults — the same values CI boots the stack under. Override any of them in `.env` (the knobs and their defaults are listed in `.env.example`, e.g. `TRAEFIK_MEMORY_LIMIT=512m`) and the override survives every `git pull`. If a service is OOM-killed under real load, `docker inspect <container> --format '{{.State.OOMKilled}}'` says so; raise its `_MEMORY_LIMIT` and recreate.
+
+## Backups
+
+The `backups` sidecar (same image as the server) runs on a loop: an initial delay (`MSSQL_BACKUP_INIT_SLEEP`, default 30m), then every `MSSQL_BACKUP_INTERVAL` (default 24h) a `BACKUP DATABASE ... WITH CHECKSUM` of `master`, `msdb`, and every online user database into the `mssql-server-backups` volume shared with the server, each file verified with `RESTORE VERIFYONLY`; files older than `MSSQL_BACKUP_PRUNE_DAYS` (default 7) are pruned. Each database logs `Database backup OK: <file> (<bytes> bytes)` or `Database backup FAILED` (the file is kept as `<file>.failed`) — grep the log for `FAILED` from your monitoring.
+
+**Verify backups are running:**
+
+```bash
+docker compose -p mssql logs backups | tail -5
+docker compose -p mssql exec backups ls -la /var/opt/mssql/backup/
+```
+
+**Restore** a user database with the interactive script (`chmod +x mssql-restore-database.sh` once): it lists the `.bak` files, derives the database name from the file name, drops other connections, runs `RESTORE DATABASE ... WITH REPLACE`, and returns the database to multi-user mode.
+
+```bash
+./mssql-restore-database.sh
+```
+
+**Off-host replication.** The backup volume lives on the same host as the data. Bind-mount `MSSQL_BACKUPS_PATH` to a directory covered by your off-host backup solution (restic, rclone, Borg, S3 sync). Backups are not compressed (Express cannot create compressed backups); compress in transit if size matters.
 
 ## Testing
 

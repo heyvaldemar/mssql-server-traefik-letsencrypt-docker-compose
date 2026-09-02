@@ -17,6 +17,7 @@ networks:
 
 volumes:
   mssql-server-data:
+  mssql-server-backups:
   traefik-certificates:
 
 services:
@@ -35,6 +36,7 @@ services:
     platform: linux/amd64
     volumes:
       - mssql-server-data:/var/opt/mssql
+      - mssql-server-backups:${MSSQL_BACKUPS_PATH:-/var/opt/mssql/backup}
     environment:
       ACCEPT_EULA: 'Y'
       MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?set in .env - see .env.example}
@@ -154,3 +156,67 @@ services:
       # Pass the original Host header to the backend
       - "traefik.http.services.dashboard.loadbalancer.passhostheader=true"
     restart: unless-stopped
+
+  backups:
+    image: *mssql-image
+    platform: linux/amd64
+    # Resource limits as .env-overridable defaults (e.g. MSSQL_SERVER_BACKUPS_MEMORY_LIMIT=2g);
+    # the override survives every git pull.
+    deploy:
+      resources:
+        limits:
+          memory: ${MSSQL_SERVER_BACKUPS_MEMORY_LIMIT:-256m}
+          cpus: "${MSSQL_SERVER_BACKUPS_CPU_LIMIT:-0.5}"
+        reservations:
+          memory: ${MSSQL_SERVER_BACKUPS_MEMORY_RESERVATION:-32m}
+          cpus: "${MSSQL_SERVER_BACKUPS_CPU_RESERVATION:-0.1}"
+    # Runs as root only to own the shared backup directory: SQL Server (uid
+    # 10001) writes the .bak files there, and a fresh named volume is
+    # root-owned until someone fixes that.
+    user: root
+    entrypoint: ["/bin/bash", "-c"]
+    # Every cycle: BACKUP DATABASE for master, msdb, and every online user
+    # database (WITH CHECKSUM - no COMPRESSION, which Express does not
+    # support), then RESTORE VERIFYONLY proves each file is restorable.
+    # Logs 'Database backup OK'/'FAILED' per database; a failed file is kept
+    # as .failed for diagnosis. Retention 0 disables pruning.
+    command:
+      - |
+        set -o pipefail
+        sql() { /opt/mssql-tools18/bin/sqlcmd -S mssql -U sa -P "$$MSSQL_SA_PASSWORD" -C -b "$$@"; }
+        chown 10001:0 "$$MSSQL_BACKUPS_PATH" && chmod 770 "$$MSSQL_BACKUPS_PATH"
+        sleep "$$MSSQL_BACKUP_INIT_SLEEP"
+        while true; do
+          STAMP="$$(date +%Y-%m-%d_%H-%M)"
+          DBS="$$(sql -h -1 -W -Q "SET NOCOUNT ON; SELECT name FROM sys.databases WHERE (name IN ('master','msdb') OR database_id > 4) AND state_desc = 'ONLINE'" | tr -d '\r' | grep -v '^$$')"
+          for db in $$DBS; do
+            FILE="$$MSSQL_BACKUPS_PATH/$$MSSQL_BACKUP_NAME-$$db-$$STAMP.bak"
+            echo "[$$(date -Iseconds)] Starting database backup of [$$db] to $$FILE"
+            if sql -Q "BACKUP DATABASE [$$db] TO DISK = N'$$FILE' WITH INIT, FORMAT, CHECKSUM" > /dev/null \
+               && sql -Q "RESTORE VERIFYONLY FROM DISK = N'$$FILE' WITH CHECKSUM" > /dev/null; then
+              echo "[$$(date -Iseconds)] Database backup OK: $$FILE ($$(stat -c %s "$$FILE") bytes)"
+            else
+              echo "[$$(date -Iseconds)] Database backup FAILED - partial file kept as $$FILE.failed for diagnosis" >&2
+              mv "$$FILE" "$$FILE.failed" 2>/dev/null || true
+            fi
+          done
+          if [ "$${MSSQL_BACKUP_PRUNE_DAYS:-0}" -ge 1 ]; then
+            find "$$MSSQL_BACKUPS_PATH" -type f -name "$$MSSQL_BACKUP_NAME-*" -mtime "+$$MSSQL_BACKUP_PRUNE_DAYS" -delete
+          fi
+          sleep "$$MSSQL_BACKUP_INTERVAL"
+        done
+    volumes:
+      - mssql-server-backups:${MSSQL_BACKUPS_PATH:-/var/opt/mssql/backup}
+    environment:
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?set in .env - see .env.example}
+      MSSQL_BACKUP_INIT_SLEEP: ${MSSQL_BACKUP_INIT_SLEEP:-30m}
+      MSSQL_BACKUP_INTERVAL: ${MSSQL_BACKUP_INTERVAL:-24h}
+      MSSQL_BACKUP_PRUNE_DAYS: ${MSSQL_BACKUP_PRUNE_DAYS:-7}
+      MSSQL_BACKUPS_PATH: ${MSSQL_BACKUPS_PATH:-/var/opt/mssql/backup}
+      MSSQL_BACKUP_NAME: ${MSSQL_BACKUP_NAME:-mssql-backup}
+    networks:
+      - mssql-server-network
+    restart: unless-stopped
+    depends_on:
+      mssql:
+        condition: service_healthy

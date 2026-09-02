@@ -204,6 +204,8 @@ jobs:
           TRAEFIK_HOSTNAME=${APP_TRAEFIK_HOSTNAME}
           TRAEFIK_BASIC_AUTH=traefikadmin:\$\$2y\$\$10\$\$sMzJfirKC75x/hVpiINeZOiSm.Jkity9cn4KwNkRvO7hSQVFc5FLO
           MSSQL_SA_PASSWORD=Ci-$(openssl rand -hex 12)-aA1
+          MSSQL_BACKUP_INIT_SLEEP=15s
+          MSSQL_BACKUP_INTERVAL=60s
           EOF
           echo "Generated ephemeral .env for CI run"
 
@@ -234,6 +236,17 @@ jobs:
         run: |
           docker compose -f mssql-server-traefik-letsencrypt-docker-compose.yml -p mssql exec -T mssql \
             /bin/sh -c '/opt/mssql-tools18/bin/sqlcmd -S traefik,1433 -U sa -P "$MSSQL_SA_PASSWORD" -C -b -Q "SELECT @@VERSION"'
+
+      - name: Verify a backup is produced and valid
+        # Log-driven: the file named in a 'backup OK' line is complete by
+        # definition (BACKUP DATABASE + RESTORE VERIFYONLY both passed).
+        run: |
+          # shellcheck disable=SC2016
+          timeout 6m bash -c 'until docker compose -f "$DOCKER_COMPOSE_FILE" -p "$COMPOSE_PROJECT_NAME" logs backups 2>/dev/null | grep -q "Database backup OK"; do echo "Waiting for the first backup cycle..."; sleep 10; done'
+          docker compose -f "$DOCKER_COMPOSE_FILE" -p "$COMPOSE_PROJECT_NAME" logs backups 2>/dev/null | grep "Database backup OK" | cut -c1-160
+          f=$(docker compose -f "$DOCKER_COMPOSE_FILE" -p "$COMPOSE_PROJECT_NAME" logs backups 2>/dev/null | grep "Database backup OK" | tail -1 | sed -E 's/.*Database backup OK: ([^ ]+) .*/\1/')
+          docker compose -f "$DOCKER_COMPOSE_FILE" -p "$COMPOSE_PROJECT_NAME" exec -T backups sh -c "/opt/mssql-tools18/bin/sqlcmd -S mssql -U sa -P \"\$MSSQL_SA_PASSWORD\" -C -b -Q \"RESTORE VERIFYONLY FROM DISK = N'$f' WITH CHECKSUM\"" && echo "Backup verified restorable: $f"
+          docker compose -f "$DOCKER_COMPOSE_FILE" -p "$COMPOSE_PROJECT_NAME" logs backups 2>/dev/null | grep -i "backup FAILED" && { echo "::error::the backups log reports a failure"; exit 1; } || true
 
       - name: Wait for the Traefik dashboard to be ready
         run: |
