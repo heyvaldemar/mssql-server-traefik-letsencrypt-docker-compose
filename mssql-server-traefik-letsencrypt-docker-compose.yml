@@ -22,6 +22,16 @@ volumes:
 services:
   mssql:
     image: *mssql-image
+    # Resource limits as .env-overridable defaults (e.g. MSSQL_SERVER_MSSQL_MEMORY_LIMIT=2g);
+    # the override survives every git pull.
+    deploy:
+      resources:
+        limits:
+          memory: ${MSSQL_SERVER_MSSQL_MEMORY_LIMIT:-2g}
+          cpus: "${MSSQL_SERVER_MSSQL_CPU_LIMIT:-2.0}"
+        reservations:
+          memory: ${MSSQL_SERVER_MSSQL_MEMORY_RESERVATION:-256m}
+          cpus: "${MSSQL_SERVER_MSSQL_CPU_RESERVATION:-0.5}"
     platform: linux/amd64
     volumes:
       - mssql-server-data:/var/opt/mssql
@@ -62,6 +72,16 @@ services:
 
   traefik:
     image: *traefik-image
+    # Resource limits as .env-overridable defaults (e.g. TRAEFIK_MEMORY_LIMIT=2g);
+    # the override survives every git pull.
+    deploy:
+      resources:
+        limits:
+          memory: ${TRAEFIK_MEMORY_LIMIT:-256m}
+          cpus: "${TRAEFIK_CPU_LIMIT:-0.5}"
+        reservations:
+          memory: ${TRAEFIK_MEMORY_RESERVATION:-64m}
+          cpus: "${TRAEFIK_CPU_RESERVATION:-0.1}"
     command:
       # Set the log level (DEBUG, INFO, WARN, ERROR)
       - "--log.level=${TRAEFIK_LOG_LEVEL:-WARN}"
