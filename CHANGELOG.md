@@ -46,7 +46,7 @@ _(no unreleased changes yet)_
   stack, run by CI on every push, on a database the tests create
   themselves: the required-variable guard fires, a backup of that
   database is produced, `RESTORE VERIFYONLY` passes on it, a SQL Server
-  outage is reported as `FAILED`, **restore genuinely replaces database
+ outage is reported as `FAILED`, **restore replaces database
   state** (`RESTORE ... WITH REPLACE` of the baseline removes a table
   created after it), and pruning removes only old files.
 

@@ -2,7 +2,7 @@
 
 [![Deployment Verification](https://github.com/heyvaldemar/mssql-server-traefik-letsencrypt-docker-compose/actions/workflows/deployment-verification.yml/badge.svg?branch=main)](https://github.com/heyvaldemar/mssql-server-traefik-letsencrypt-docker-compose/actions/workflows/deployment-verification.yml)
 
-This repository deploys **Microsoft SQL Server 2022** behind **Traefik**, with SQL traffic routed through a dedicated TCP entrypoint on port 1433 and the Traefik dashboard served over automatic **Let's Encrypt TLS**.
+This repository deploys Microsoft SQL Server 2022 behind Traefik, with SQL traffic routed through a dedicated TCP entrypoint on port 1433 and the Traefik dashboard served over automatic Let's Encrypt TLS.
 
 📙 Full narrative installation guide on the blog: [heyvaldemar.com/install-mssql-server-using-docker-compose/](https://www.heyvaldemar.com/install-mssql-server-using-docker-compose/).
 
@@ -65,7 +65,7 @@ Both are pinned to `tag@sha256:<digest>` as interpolation defaults in the compos
 
 Two override levels exist per image. `<PREFIX>_IMAGE_VERSION` in `.env` swaps only the version of that image (Compose then pulls the tag, without a digest) and leaves every other pin as tested; `<PREFIX>_IMAGE_TAG` replaces the whole reference, digest included. The variable names are listed in `.env.example`. Nested defaults need Docker Compose v2.5 or newer (2022); v2.0 to v2.4 leave the inner `${...}` unexpanded and `docker compose up` fails with an invalid reference instead of deploying something unexpected.
 
-The daily `check-pin-freshness` CI job re-resolves each pinned tag against its registry and compares the pinned cumulative update against the newest CU **in the same release line** (currently 2022). The yearly engine line is never bumped by a routine update: attaching existing data files to a newer engine (2022 → 2025) upgrades them one-way, so that jump only ever happens in a major release of this template with explicit upgrade notes. GitHub Actions are pinned by commit SHA with version comments; Dependabot keeps those fresh.
+The daily `check-pin-freshness` CI job re-resolves each pinned tag against its registry and compares the pinned cumulative update against the newest CU in the same release line (currently 2022). The yearly engine line is never bumped by a routine update: attaching existing data files to a newer engine (2022 → 2025) upgrades them one-way, so that jump only ever happens in a major release of this template with explicit upgrade notes. GitHub Actions are pinned by commit SHA with version comments; Dependabot keeps those fresh.
 
 The image is published for `linux/amd64` only and the compose file declares that platform explicitly.
 
@@ -138,7 +138,7 @@ chmod +x tests/e2e-backup-restore.sh
 ./tests/e2e-backup-restore.sh
 ```
 
-## Security Notes
+## Security notes
 
 - Credentials are read from `.env` at deploy time; `.env` is gitignored and required variables fail fast with `${VAR:?…}` guards.
 - **Pre-rotation advisory.** Before v1.0.0 this repository tracked a `.env` containing a literal `MSSQL_SA_PASSWORD` value. That value remains in git history. Anyone who deployed with it (or an `.env` derived from it) should change the `sa` password: `ALTER LOGIN sa WITH PASSWORD = '<new strong password>'`, then update `.env` and `docker compose up -d --force-recreate`.
