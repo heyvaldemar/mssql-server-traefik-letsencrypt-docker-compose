@@ -125,6 +125,17 @@ post_marker_backup() {
 marker_count() {
   sql "SET NOCOUNT ON; SELECT count(*) FROM [$TEST_DB].dbo.restore_test;" | tr -d '[:space:]'
 }
+# the server answers on master before user databases finish recovery, and
+# a query against a recovering database returns "Msg 904" instead of a number
+wait_for_test_db_online() {
+  local timeout="${1:-120}" elapsed=0 state
+  while [[ $elapsed -lt $timeout ]]; do
+    state=$(sql "SET NOCOUNT ON; SELECT state_desc FROM sys.databases WHERE name = '$TEST_DB';" 2>/dev/null | tr -d '[:space:]')
+    [[ "$state" == "ONLINE" ]] && return 0
+    sleep 3; elapsed=$((elapsed + 3))
+  done
+  return 1
+}
 
 # --- Test cases ---
 
@@ -162,6 +173,7 @@ test_backup_failure_detected() {
   echo "  restarting SQL Server"
   docker start "$DB_CONTAINER" > /dev/null
   wait_for_db_ready 180 || { fail "SQL Server did not become ready within 180s after restart"; return 1; }
+  wait_for_test_db_online 180 || { fail "$TEST_DB did not come back ONLINE within 180s after restart"; return 1; }
   # sqlcmd cannot even list the databases while the server is down, so the
   # loop logs FAILED without a partial file; the log line is the evidence.
   docker logs "$BACKUPS_CONTAINER" 2>&1 | grep -i "backup FAILED" > /dev/null || { fail "expected a 'backup FAILED' log line"; return 1; }
@@ -175,7 +187,7 @@ test_restore_roundtrip() {
   echo "  baseline: $baseline"
   sql "IF OBJECT_ID('[$TEST_DB].dbo.restore_test') IS NULL CREATE TABLE [$TEST_DB].dbo.restore_test (id int); INSERT INTO [$TEST_DB].dbo.restore_test VALUES (1);" > /dev/null
   before=$(marker_count)
-  [[ "$before" -ge 1 ]] || { fail "marker insert failed: count=$before"; return 1; }
+  [[ "$before" =~ ^[0-9]+$ && "$before" -ge 1 ]] || { fail "marker insert failed: count=$before"; return 1; }
   echo "  restoring the baseline (single-user, RESTORE WITH REPLACE)"
   sql "ALTER DATABASE [$TEST_DB] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; RESTORE DATABASE [$TEST_DB] FROM DISK = N'$baseline' WITH REPLACE, RECOVERY; ALTER DATABASE [$TEST_DB] SET MULTI_USER;" > /dev/null || { fail "restore commands failed"; return 1; }
   local exists
