@@ -26,7 +26,7 @@ _(no unreleased changes yet)_
 
 ### Added
 
-- **`tests/e2e-backup-restore.sh`** — six scenarios against the live
+- **`tests/e2e-backup-restore.sh`**: six scenarios against the live
   stack, run by CI on every push, on a database the tests create
   themselves: the required-variable guard fires, a backup of that
   database is produced, `RESTORE VERIFYONLY` passes on it, a SQL Server
@@ -38,7 +38,7 @@ _(no unreleased changes yet)_
 
 ### Added
 
-- **A `backups` service** — this template persisted `/var/opt/mssql` and
+- **A `backups` service**: this template persisted `/var/opt/mssql` and
   called that a day; now a sidecar from the same image runs `BACKUP
   DATABASE ... WITH CHECKSUM` for `master`, `msdb`, and every online
   user database on a loop, verifies each file with `RESTORE VERIFYONLY`,
@@ -49,7 +49,7 @@ _(no unreleased changes yet)_
   `MSSQL_BACKUP_INTERVAL`, `MSSQL_BACKUP_PRUNE_DAYS`, path and name)
   have defaults listed in `.env.example`. No `COMPRESSION`, which
   Express does not support.
-- **`mssql-restore-database.sh`** — interactive restore of a user
+- **`mssql-restore-database.sh`**: interactive restore of a user
   database from a selected `.bak` (single-user mode, `RESTORE ... WITH
   REPLACE`, back to multi-user). System databases are refused with a
   pointer to Microsoft's procedure.
@@ -73,7 +73,7 @@ _(no unreleased changes yet)_
 
 ### Added
 
-- **`update.sh`** — unattended updates to the newest tagged release,
+- **`update.sh`**: unattended updates to the newest tagged release,
   and nothing else: a tag is cut only after CI has booted the pinned
   images and passed the smoke tests, so "update to the latest tag" means
   "update to a combination a machine has already run". It refuses to
@@ -88,7 +88,7 @@ in [keycloak-traefik-letsencrypt-docker-compose](https://github.com/heyvaldemar/
 
 ### Fixed (the shipped configuration could not work as promised)
 
-- **The Traefik TCP router pointed at port 11434** — SQL Server listens
+- **The Traefik TCP router pointed at port 11434**: SQL Server listens
   on 1433, so every connection through the published entrypoint went
   nowhere. The router now targets 1433, and CI proves the routed path by
   running a query through Traefik.
@@ -116,7 +116,7 @@ in [keycloak-traefik-letsencrypt-docker-compose](https://github.com/heyvaldemar/
   jump is reserved for a major release with explicit upgrade notes.
 - Required variables now fail fast with `${VAR:?…}` guards;
   `TRAEFIK_LOG_LEVEL` and `MSSQL_PID` have defaults.
-- `platform: linux/amd64` declared explicitly — the upstream image
+- `platform: linux/amd64` declared explicitly: the upstream image
   publishes no other architecture.
 
 ### Added

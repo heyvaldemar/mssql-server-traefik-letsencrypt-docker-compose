@@ -1,4 +1,4 @@
-# Microsoft SQL Server + Traefik + Let's Encrypt — Docker Compose
+# Microsoft SQL Server + Traefik + Let's Encrypt on Docker Compose
 
 [![Deployment Verification](https://github.com/heyvaldemar/mssql-server-traefik-letsencrypt-docker-compose/actions/workflows/deployment-verification.yml/badge.svg?branch=main)](https://github.com/heyvaldemar/mssql-server-traefik-letsencrypt-docker-compose/actions/workflows/deployment-verification.yml)
 
@@ -58,10 +58,10 @@ docker compose -f mssql-server-traefik-letsencrypt-docker-compose.yml -p mssql u
 
 This repository is a deployment template, not a custom image. It orchestrates two upstream images:
 
-- [`mcr.microsoft.com/mssql/server`](https://mcr.microsoft.com/en-us/artifact/mar/mssql/server/about) — SQL Server on Linux, Microsoft's official image
-- [`traefik`](https://hub.docker.com/_/traefik) — reverse proxy, Docker Hub official image
+- [`mcr.microsoft.com/mssql/server`](https://mcr.microsoft.com/en-us/artifact/mar/mssql/server/about): SQL Server on Linux, Microsoft's official image
+- [`traefik`](https://hub.docker.com/_/traefik): reverse proxy, Docker Hub official image
 
-Both are pinned to `tag@sha256:<digest>` as interpolation defaults in the compose file's `x-images` block. Compose pulls by digest, not by tag, so two users deploying on different days get byte-identical image manifests — and `git pull` alone delivers the version combination this repository has tested. Setting `MSSQL_IMAGE_TAG` or `TRAEFIK_IMAGE_TAG` in `.env` overrides the default when you deliberately want a different version.
+Both are pinned to `tag@sha256:<digest>` as interpolation defaults in the compose file's `x-images` block. Compose pulls by digest, not by tag, so two users deploying on different days get byte-identical image manifests, and `git pull` alone delivers the version combination this repository has tested. Setting `MSSQL_IMAGE_TAG` or `TRAEFIK_IMAGE_TAG` in `.env` overrides the default when you deliberately want a different version.
 
 The daily `check-pin-freshness` CI job re-resolves each pinned tag against its registry and compares the pinned cumulative update against the newest CU **in the same release line** (currently 2022). The yearly engine line is never bumped by a routine update: attaching existing data files to a newer engine (2022 → 2025) upgrades them one-way, so that jump only ever happens in a major release of this template with explicit upgrade notes. GitHub Actions are pinned by commit SHA with version comments; Dependabot keeps those fresh.
 
@@ -72,7 +72,7 @@ The image is published for `linux/amd64` only and the compose file declares that
 - [ ] **Do not expose 1433 to the internet.** SQL Server's port is scanned constantly and `sa` is the most brute-forced account name in existence. Bind the port to a private interface, firewall it to known client IPs, or reach it over VPN/SSH tunnel.
 - [ ] **Strong `sa` password, then stop using `sa`.** Create named logins with the minimum roles your applications need and disable `sa` (`ALTER LOGIN sa DISABLE`).
 - [ ] **Check your licensing.** `MSSQL_PID=Developer` is free but licensed for development only. Production needs Express (limits apply), a paid edition, or a product key.
-- [ ] **Replicate backups off-host.** The `backups` service writes verified `.bak` files into the `mssql-server-backups` volume on the same host — bind-mount it to a path your off-host backup solution covers.
+- [ ] **Replicate backups off-host.** The `backups` service writes verified `.bak` files into the `mssql-server-backups` volume on the same host. Bind-mount it to a path your off-host backup solution covers.
 - [ ] **Plan engine upgrades deliberately.** Moving to SQL Server 2025 upgrades database files one-way on first attach. Take full backups first, test the restore on the new engine, then change the pin.
 - [ ] **Lock down the Traefik dashboard.** Basic auth is basic. Consider Traefik's `IPAllowList` middleware or not exposing the dashboard publicly at all.
 
@@ -92,17 +92,17 @@ Put it on a timer for hands-off minor/patch updates:
 17 5 * * *  /opt/mssql-server-traefik-letsencrypt-docker-compose/update.sh >> /var/log/mssql-server-update.log 2>&1
 ```
 
-The script refuses to cross a MAJOR template version on its own — majors are breaking by definition and their release notes exist to be read. After reading them, `./update.sh --allow-major` performs the jump. It also refuses to touch a checkout with local modifications: your customization belongs in `.env`, which updates never overwrite.
+The script refuses to cross a MAJOR template version on its own: majors are breaking by definition and their release notes exist to be read. After reading them, `./update.sh --allow-major` performs the jump. It also refuses to touch a checkout with local modifications: your customization belongs in `.env`, which updates never overwrite.
 
 This is deliberately a host-side script and not a container in the stack: an in-stack updater needs the Docker socket (root on the host) and turns "someone pushed to a repo" into "someone deployed to your machine" with no operator in the loop. A cron job under your own user updates only to tagged, CI-verified states and leaves the trust boundary where it was.
 
 ## Resource limits
 
-Every service carries memory and CPU limits plus reservations as compose-level defaults — the same values CI boots the stack under. Override any of them in `.env` (the knobs and their defaults are listed in `.env.example`, e.g. `TRAEFIK_MEMORY_LIMIT=512m`) and the override survives every `git pull`. If a service is OOM-killed under real load, `docker inspect <container> --format '{{.State.OOMKilled}}'` says so; raise its `_MEMORY_LIMIT` and recreate.
+Every service carries memory and CPU limits plus reservations as compose-level defaults, the same values CI boots the stack under. Override any of them in `.env` (the knobs and their defaults are listed in `.env.example`, e.g. `TRAEFIK_MEMORY_LIMIT=512m`) and the override survives every `git pull`. If a service is OOM-killed under real load, `docker inspect <container> --format '{{.State.OOMKilled}}'` says so; raise its `_MEMORY_LIMIT` and recreate.
 
 ## Backups
 
-The `backups` sidecar (same image as the server) runs on a loop: an initial delay (`MSSQL_BACKUP_INIT_SLEEP`, default 30m), then every `MSSQL_BACKUP_INTERVAL` (default 24h) a `BACKUP DATABASE ... WITH CHECKSUM` of `master`, `msdb`, and every online user database into the `mssql-server-backups` volume shared with the server, each file verified with `RESTORE VERIFYONLY`; files older than `MSSQL_BACKUP_PRUNE_DAYS` (default 7) are pruned. Each database logs `Database backup OK: <file> (<bytes> bytes)` or `Database backup FAILED` (the file is kept as `<file>.failed`) — grep the log for `FAILED` from your monitoring.
+The `backups` sidecar (same image as the server) runs on a loop: an initial delay (`MSSQL_BACKUP_INIT_SLEEP`, default 30m), then every `MSSQL_BACKUP_INTERVAL` (default 24h) a `BACKUP DATABASE ... WITH CHECKSUM` of `master`, `msdb`, and every online user database into the `mssql-server-backups` volume shared with the server, each file verified with `RESTORE VERIFYONLY`; files older than `MSSQL_BACKUP_PRUNE_DAYS` (default 7) are pruned. Each database logs `Database backup OK: <file> (<bytes> bytes)` or `Database backup FAILED` (the file is kept as `<file>.failed`). Grep the log for `FAILED` from your monitoring.
 
 **Verify backups are running:**
 
@@ -125,11 +125,11 @@ Every service runs with `security_opt: no-new-privileges:true`, so a process can
 
 ## Testing
 
-The [Deployment Verification](https://github.com/heyvaldemar/mssql-server-traefik-letsencrypt-docker-compose/actions/workflows/deployment-verification.yml?query=branch%3Amain) workflow runs on every push, pull request, and every day at 06:00 UTC: shellcheck + actionlint, a Trivy scan of each pinned image, the daily `check-pin-freshness` job, and a deploy-and-test job that boots the full stack with an ephemeral `.env`, waits for the engine's healthcheck, and executes a query through Traefik's TCP entrypoint — proving the routed path, not just the container.
+The [Deployment Verification](https://github.com/heyvaldemar/mssql-server-traefik-letsencrypt-docker-compose/actions/workflows/deployment-verification.yml?query=branch%3Amain) workflow runs on every push, pull request, and every day at 06:00 UTC: shellcheck + actionlint, a Trivy scan of each pinned image, the daily `check-pin-freshness` job, and a deploy-and-test job that boots the full stack with an ephemeral `.env`, waits for the engine's healthcheck, and executes a query through Traefik's TCP entrypoint, proving the routed path, not just the container.
 
 ### Backup and restore, proven
 
-`tests/e2e-backup-restore.sh` runs against the live stack and is what CI executes after the smoke test. It works on a database it creates itself (`e2e_test`), so nothing of yours is touched — but the failure scenario stops the SQL Server container briefly, so run it on a staging copy. The scenario that matters most is the restore roundtrip: create a table after the baseline backup, `RESTORE ... WITH REPLACE` the baseline, assert the table is gone.
+`tests/e2e-backup-restore.sh` runs against the live stack and is what CI executes after the smoke test. It works on a database it creates itself (`e2e_test`), so nothing of yours is touched, but the failure scenario stops the SQL Server container briefly, so run it on a staging copy. The scenario that matters most is the restore roundtrip: create a table after the baseline backup, `RESTORE ... WITH REPLACE` the baseline, assert the table is gone.
 
 ```bash
 chmod +x tests/e2e-backup-restore.sh
@@ -147,7 +147,7 @@ chmod +x tests/e2e-backup-restore.sh
 
 <div align="center">
 
-**Maintained by [Vladimir Mikhalev](https://github.com/heyvaldemar)** — Docker Captain · IBM Champion · AWS Community Builder
+**Maintained by [Vladimir Mikhalev](https://github.com/heyvaldemar)** · Docker Captain · IBM Champion · AWS Community Builder
 
 [YouTube](https://www.youtube.com/channel/UCf85kQ0u1sYTTTyKVpxrlyQ?sub_confirmation=1) · [Blog](https://heyvaldemar.com) · [LinkedIn](https://www.linkedin.com/in/heyvaldemar/)
 
