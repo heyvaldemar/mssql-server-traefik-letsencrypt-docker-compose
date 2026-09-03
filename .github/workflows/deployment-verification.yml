@@ -248,6 +248,15 @@ jobs:
           docker compose -f "$DOCKER_COMPOSE_FILE" -p "$COMPOSE_PROJECT_NAME" exec -T backups sh -c "/opt/mssql-tools18/bin/sqlcmd -S mssql -U sa -P \"\$MSSQL_SA_PASSWORD\" -C -b -Q \"RESTORE VERIFYONLY FROM DISK = N'$f' WITH CHECKSUM\"" && echo "Backup verified restorable: $f"
           docker compose -f "$DOCKER_COMPOSE_FILE" -p "$COMPOSE_PROJECT_NAME" logs backups 2>/dev/null | grep -i "backup FAILED" && { echo "::error::the backups log reports a failure"; exit 1; } || true
 
+      - name: Run the backup/restore end-to-end tests
+        # Against a database the tests create themselves: backup produced,
+        # RESTORE VERIFYONLY passes, failure detected when SQL Server is down,
+        # restore genuinely replaces state (RESTORE WITH REPLACE, marker gone),
+        # prune keeps recent files. Same script a maintainer runs on staging.
+        run: |
+          chmod +x tests/e2e-backup-restore.sh
+          ./tests/e2e-backup-restore.sh
+
       - name: Wait for the Traefik dashboard to be ready
         run: |
           # shellcheck disable=SC2016

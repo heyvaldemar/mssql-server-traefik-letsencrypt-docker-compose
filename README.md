@@ -123,6 +123,15 @@ docker compose -p mssql exec backups ls -la /var/opt/mssql/backup/
 
 The [Deployment Verification](https://github.com/heyvaldemar/mssql-server-traefik-letsencrypt-docker-compose/actions/workflows/deployment-verification.yml?query=branch%3Amain) workflow runs on every push, pull request, and every day at 06:00 UTC: shellcheck + actionlint, a Trivy scan of each pinned image, the daily `check-pin-freshness` job, and a deploy-and-test job that boots the full stack with an ephemeral `.env`, waits for the engine's healthcheck, and executes a query through Traefik's TCP entrypoint — proving the routed path, not just the container.
 
+### Backup and restore, proven
+
+`tests/e2e-backup-restore.sh` runs against the live stack and is what CI executes after the smoke test. It works on a database it creates itself (`e2e_test`), so nothing of yours is touched — but the failure scenario stops the SQL Server container briefly, so run it on a staging copy. The scenario that matters most is the restore roundtrip: create a table after the baseline backup, `RESTORE ... WITH REPLACE` the baseline, assert the table is gone.
+
+```bash
+chmod +x tests/e2e-backup-restore.sh
+./tests/e2e-backup-restore.sh
+```
+
 ## Security Notes
 
 - Credentials are read from `.env` at deploy time; `.env` is gitignored and required variables fail fast with `${VAR:?…}` guards.
