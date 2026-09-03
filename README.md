@@ -63,6 +63,8 @@ This repository is a deployment template, not a custom image. It orchestrates tw
 
 Both are pinned to `tag@sha256:<digest>` as interpolation defaults in the compose file's `x-images` block. Compose pulls by digest, not by tag, so two users deploying on different days get byte-identical image manifests, and `git pull` alone delivers the version combination this repository has tested. Setting `MSSQL_IMAGE_TAG` or `TRAEFIK_IMAGE_TAG` in `.env` overrides the default when you deliberately want a different version.
 
+Two override levels exist per image. `<PREFIX>_IMAGE_VERSION` in `.env` swaps only the version of that image (Compose then pulls the tag, without a digest) and leaves every other pin as tested; `<PREFIX>_IMAGE_TAG` replaces the whole reference, digest included. The variable names are listed in `.env.example`. Nested defaults need Docker Compose v2.5 or newer (2022); v2.0 to v2.4 leave the inner `${...}` unexpanded and `docker compose up` fails with an invalid reference instead of deploying something unexpected.
+
 The daily `check-pin-freshness` CI job re-resolves each pinned tag against its registry and compares the pinned cumulative update against the newest CU **in the same release line** (currently 2022). The yearly engine line is never bumped by a routine update: attaching existing data files to a newer engine (2022 → 2025) upgrades them one-way, so that jump only ever happens in a major release of this template with explicit upgrade notes. GitHub Actions are pinned by commit SHA with version comments; Dependabot keeps those fresh.
 
 The image is published for `linux/amd64` only and the compose file declares that platform explicitly.

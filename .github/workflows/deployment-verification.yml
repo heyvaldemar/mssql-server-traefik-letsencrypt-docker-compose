@@ -133,7 +133,7 @@ jobs:
         # updates within the pinned release line only; the yearly line is
         # bumped deliberately in a major release of this template.
         run: |
-          pin="$(grep -oE '\$\{MSSQL_IMAGE_TAG:-[^}]+\}' mssql-server-traefik-letsencrypt-docker-compose.yml | head -1 | sed -E 's/^\$\{MSSQL_IMAGE_TAG:-//; s/\}$//')"
+          pin="$(grep -m1 -oE '\$\{MSSQL_IMAGE_TAG:-.*' mssql-server-traefik-letsencrypt-docker-compose.yml | sed -E -e ':a' -e 's/\$\{[A-Z_]+:-([^{}]*)\}/\1/' -e 'ta')"
           ref="${pin%%@*}"
           pinned_tag="${ref##*:}"
           line="${pinned_tag%%-*}"
@@ -153,7 +153,7 @@ jobs:
 
       - name: Compare pinned Traefik minor against the latest release
         run: |
-          pin="$(grep -oE '\$\{TRAEFIK_IMAGE_TAG:-[^}]+\}' mssql-server-traefik-letsencrypt-docker-compose.yml | head -1 | sed -E 's/^\$\{TRAEFIK_IMAGE_TAG:-//; s/\}$//')"
+          pin="$(grep -m1 -oE '\$\{TRAEFIK_IMAGE_TAG:-.*' mssql-server-traefik-letsencrypt-docker-compose.yml | sed -E -e ':a' -e 's/\$\{[A-Z_]+:-([^{}]*)\}/\1/' -e 'ta')"
           ref="${pin%%@*}"
           pinned_minor="${ref##*:}"
           latest="$(curl -fsSL --retry 3 -H "Authorization: Bearer $GH_API_TOKEN" https://api.github.com/repos/traefik/traefik/releases/latest | jq -r .tag_name)"
