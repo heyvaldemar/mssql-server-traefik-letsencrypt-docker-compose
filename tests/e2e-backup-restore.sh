@@ -130,8 +130,11 @@ marker_count() {
 wait_for_test_db_online() {
   local timeout="${1:-120}" elapsed=0 state
   while [[ $elapsed -lt $timeout ]]; do
-    state=$(sql "SET NOCOUNT ON; SELECT state_desc FROM sys.databases WHERE name = '$TEST_DB';" 2>/dev/null | tr -d '[:space:]')
-    [[ "$state" == "ONLINE" ]] && return 0
+    # state_desc says ONLINE before the server finishes its own startup; a
+    # database with AUTO_CLOSE (the Express default) then answers Msg 904,
+    # so the proof is a query that touches the database and returns a number
+    state=$(sql "SET NOCOUNT ON; SELECT count(*) FROM [$TEST_DB].sys.tables;" 2>/dev/null | tr -d '[:space:]')
+    [[ "$state" =~ ^[0-9]+$ ]] && return 0
     sleep 3; elapsed=$((elapsed + 3))
   done
   return 1
@@ -216,6 +219,10 @@ wait_for_db_ready 180 || { echo "error: SQL Server not ready" >&2; exit 1; }
 # A database of our own with known content; the loop backs up every user
 # database, so this one is in from the next cycle on.
 sql "IF DB_ID('$TEST_DB') IS NULL CREATE DATABASE [$TEST_DB];" > /dev/null
+# Express creates user databases with AUTO_CLOSE ON; a closed database cannot
+# autostart while the server is still starting (Msg 904), which turns the
+# restart in the failure-detection scenario into a race. Keep it open.
+sql "ALTER DATABASE [$TEST_DB] SET AUTO_CLOSE OFF;" > /dev/null
 sql "IF OBJECT_ID('[$TEST_DB].dbo.e2e_marker') IS NULL CREATE TABLE [$TEST_DB].dbo.e2e_marker (id int PRIMARY KEY);" > /dev/null
 backups_sh "touch ${BACKUPS_PATH}/.e2e-marker-stamp"
 
