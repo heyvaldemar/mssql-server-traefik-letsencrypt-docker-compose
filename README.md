@@ -119,6 +119,10 @@ docker compose -p mssql exec backups ls -la /var/opt/mssql/backup/
 
 **Off-host replication.** The backup volume lives on the same host as the data. Bind-mount `MSSQL_BACKUPS_PATH` to a directory covered by your off-host backup solution (restic, rclone, Borg, S3 sync). Backups are not compressed (Express cannot create compressed backups); compress in transit if size matters.
 
+## Container hardening
+
+Every service runs with `security_opt: no-new-privileges:true`, so a process cannot gain privileges through setuid binaries even if it escapes its initial capability set. Infrastructure containers (the reverse proxy, databases, caches, backups) run with `cap_drop: [ALL]` and add back only what their entrypoints need: `NET_BIND_SERVICE` for Traefik to bind :80/:443, `CHOWN`/`SETUID`/`SETGID` (and friends) for database images to own their data directory and drop to their service user. Application containers keep the default capability set on purpose: upstream images assume it, and a wrong guess there is a boot loop in production rather than a hardening win. CI boots the stack under exactly these settings on every push, so what ships is what was tested.
+
 ## Testing
 
 The [Deployment Verification](https://github.com/heyvaldemar/mssql-server-traefik-letsencrypt-docker-compose/actions/workflows/deployment-verification.yml?query=branch%3Amain) workflow runs on every push, pull request, and every day at 06:00 UTC: shellcheck + actionlint, a Trivy scan of each pinned image, the daily `check-pin-freshness` job, and a deploy-and-test job that boots the full stack with an ephemeral `.env`, waits for the engine's healthcheck, and executes a query through Traefik's TCP entrypoint — proving the routed path, not just the container.
