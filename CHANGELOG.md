@@ -7,7 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_(no unreleased changes yet)_
+### Changed
+
+- **SQL Server 2022 CU27.** A cumulative update, build 16.0.4295.3, KB5104824,
+  released 15 September 2026. It replaces CU26 from 16 July.
+
+  Cumulative updates carry every fix from the ones before them, so this is one
+  hop from CU26 and not a chain. The upstream review could not read notes for
+  the range and said so rather than guessing; the build number and date above
+  come from Microsoft's own version-history page, and the deploy job started
+  the engine on this image and answered before it landed.
+
+  A database engine update is still a database engine update: take a backup
+  before pulling it on a live deployment.
+
 
 ## [1.5.1] - 2026-09-07
 
