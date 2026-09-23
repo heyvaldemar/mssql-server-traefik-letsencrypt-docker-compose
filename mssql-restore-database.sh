@@ -12,26 +12,40 @@
 # To make the `mssql-restore-database.sh` script executable, run the following command:
 # `chmod +x mssql-restore-database.sh`
 
-MSSQL_BACKUPS_CONTAINER="$(docker ps -aqf "name=mssql-backups")"
-BACKUP_PATH="/var/opt/mssql/backup/"
-BACKUP_NAME="mssql-backup"
+#
+#   ./mssql-restore-database.sh               list and ask
+#   ./mssql-restore-database.sh <file-name>   restore that one (CI runs it this way)
+#
+# The directory and the name prefix come from the running backups container,
+# the environment its loop reads. This used to carry both as literals and find
+# the container with a name filter that misses it under any -p but mssql.
+set -uo pipefail
+PROJECT="${COMPOSE_PROJECT_NAME:-mssql}"
+MSSQL_BACKUPS_CONTAINER="$(docker ps -aq --filter "label=com.docker.compose.project=$PROJECT" \
+  --filter "label=com.docker.compose.service=backups" | head -n 1)"
+[ -n "$MSSQL_BACKUPS_CONTAINER" ] || { echo "--> No backups container in compose project '$PROJECT' (set COMPOSE_PROJECT_NAME)" >&2; exit 1; }
+BACKUP_PATH="$(docker exec "$MSSQL_BACKUPS_CONTAINER" printenv MSSQL_BACKUPS_PATH)/"
+BACKUP_NAME="$(docker exec "$MSSQL_BACKUPS_CONTAINER" printenv MSSQL_BACKUP_NAME)"
 
 sql() {
   docker exec "$MSSQL_BACKUPS_CONTAINER" sh -c '/opt/mssql-tools18/bin/sqlcmd -S mssql -U sa -P "$MSSQL_SA_PASSWORD" -C -b -Q "$1"' _ "$1"
 }
 
-echo "--> All available database backups:"
+SELECTED_DATABASE_BACKUP="${1:-}"
+if [ -z "$SELECTED_DATABASE_BACKUP" ]; then
+  echo "--> All available database backups:"
 
-for entry in $(docker container exec "$MSSQL_BACKUPS_CONTAINER" sh -c "ls $BACKUP_PATH")
-do
-  echo "$entry"
-done
+  for entry in $(docker container exec "$MSSQL_BACKUPS_CONTAINER" sh -c "ls $BACKUP_PATH")
+  do
+    echo "$entry"
+  done
 
-echo "--> Copy and paste the backup name from the list above to restore database and press [ENTER]
---> Example: ${BACKUP_NAME}-mydatabase-YYYY-MM-DD_hh-mm.bak"
-echo -n "--> "
+  echo "--> Copy and paste the backup name from the list above to restore database and press [ENTER]
+  --> Example: ${BACKUP_NAME}-mydatabase-YYYY-MM-DD_hh-mm.bak"
+  echo -n "--> "
 
-read -r SELECTED_DATABASE_BACKUP
+  read -r SELECTED_DATABASE_BACKUP
+fi
 
 echo "--> $SELECTED_DATABASE_BACKUP was selected"
 

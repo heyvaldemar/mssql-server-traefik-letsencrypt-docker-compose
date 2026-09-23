@@ -192,7 +192,9 @@ test_restore_roundtrip() {
   before=$(marker_count)
   [[ "$before" =~ ^[0-9]+$ && "$before" -ge 1 ]] || { fail "marker insert failed: count=$before"; return 1; }
   echo "  restoring the baseline (single-user, RESTORE WITH REPLACE)"
-  sql "ALTER DATABASE [$TEST_DB] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; RESTORE DATABASE [$TEST_DB] FROM DISK = N'$baseline' WITH REPLACE, RECOVERY; ALTER DATABASE [$TEST_DB] SET MULTI_USER;" > /dev/null || { fail "restore commands failed"; return 1; }
+  # THE SHIPPED SCRIPT, NOT A COPY OF ITS COMMANDS.
+  COMPOSE_PROJECT_NAME="$COMPOSE_PROJECT_NAME" ./mssql-restore-database.sh "$(basename "$baseline")" > /dev/null \
+    || { fail "./mssql-restore-database.sh failed"; return 1; }
   local exists
   exists=$(sql "SET NOCOUNT ON; SELECT count(*) FROM [$TEST_DB].sys.tables WHERE name = 'restore_test';" | tr -d '[:space:]')
   [[ "$exists" == "0" ]] || { fail "restore_test still present after restore - restore was a no-op"; return 1; }

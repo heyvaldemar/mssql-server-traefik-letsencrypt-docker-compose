@@ -119,6 +119,8 @@ docker compose -p mssql exec backups ls -la /var/opt/mssql/backup/
 ./mssql-restore-database.sh
 ```
 
+It lists the backups and asks, or takes a file name as its argument; it reads the backup directory and name from the running backups container, and CI runs it on every push.
+
 **Off-host replication.** The backup volume lives on the same host as the data. Bind-mount `MSSQL_BACKUPS_PATH` to a directory covered by your off-host backup solution (restic, rclone, Borg, S3 sync). Backups are not compressed (Express cannot create compressed backups); compress in transit if size matters.
 
 ## Container hardening

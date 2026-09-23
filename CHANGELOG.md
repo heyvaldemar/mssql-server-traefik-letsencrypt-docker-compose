@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **CI had never run the restore script.** The test restored with its own
+  copy of the commands. The script carried the backup directory and name
+  prefix as literals, found its container with a name filter that misses it
+  under any `-p` but `mssql`, and could only be run by hand. It now reads both
+  from the running backups container, finds the container by its compose
+  labels, accepts the file name as an argument, and CI runs it: a row added
+  after a backup must be gone once that backup is restored.
+
 ### Changed
 
 - **The README's Testing section describes the workflows as they are.** It still listed the freshness check inside Deployment Verification after that check moved to its own workflow.
