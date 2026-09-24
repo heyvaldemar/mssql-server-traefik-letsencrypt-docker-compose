@@ -36,21 +36,21 @@ jobs:
       APP_HOSTNAME: mssql.heyvaldemardy.net
       APP_TRAEFIK_HOSTNAME: traefik.mssql.heyvaldemardy.net
       COMPOSE_PROJECT_NAME: mssql
-      APP_URL: 
+      APP_URL: ""
       APP_OK: "200|302|303"
-      DB_ENGINE: mssql
-      DB_HOST: mssql
-      DB_NAME_ENV: =dr_drill
-      DB_USER_ENV: =sa
+      DB_ENGINE: "mssql"
+      DB_HOST: "mssql"
+      DB_NAME_ENV: "=dr_drill"
+      DB_USER_ENV: "=sa"
       DB_PASS_ENV: "MSSQL_SA_PASSWORD"
-      DB_DIR_ENV: MSSQL_BACKUPS_PATH
+      DB_DIR_ENV: "MSSQL_BACKUPS_PATH"
       DATA_DIR_ENV: ""
       DATA_PATH_ENV: ""
-      DB_FILE_MATCH: '-dr_drill-[0-9_-]+\.bak$'
-      DATA_FILE_MATCH: ''
-      DB_RESTORE: './mssql-restore-database.sh "$F"'
-      DATA_RESTORE: ''
-      DR_DIAG: ''
+      DB_FILE_MATCH: "-dr_drill-[0-9_-]+\\.bak$"
+      DATA_FILE_MATCH: ""
+      DB_RESTORE: "./mssql-restore-database.sh \"$F\""
+      DATA_RESTORE: ""
+      DR_DIAG: ""
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -130,21 +130,21 @@ jobs:
       APP_HOSTNAME: mssql.heyvaldemardy.net
       APP_TRAEFIK_HOSTNAME: traefik.mssql.heyvaldemardy.net
       COMPOSE_PROJECT_NAME: mssql
-      APP_URL: 
+      APP_URL: ""
       APP_OK: "200|302|303"
-      DB_ENGINE: mssql
-      DB_HOST: mssql
-      DB_NAME_ENV: =dr_drill
-      DB_USER_ENV: =sa
+      DB_ENGINE: "mssql"
+      DB_HOST: "mssql"
+      DB_NAME_ENV: "=dr_drill"
+      DB_USER_ENV: "=sa"
       DB_PASS_ENV: "MSSQL_SA_PASSWORD"
-      DB_DIR_ENV: MSSQL_BACKUPS_PATH
+      DB_DIR_ENV: "MSSQL_BACKUPS_PATH"
       DATA_DIR_ENV: ""
       DATA_PATH_ENV: ""
-      DB_FILE_MATCH: '-dr_drill-[0-9_-]+\.bak$'
-      DATA_FILE_MATCH: ''
-      DB_RESTORE: './mssql-restore-database.sh "$F"'
-      DATA_RESTORE: ''
-      DR_DIAG: ''
+      DB_FILE_MATCH: "-dr_drill-[0-9_-]+\\.bak$"
+      DATA_FILE_MATCH: ""
+      DB_RESTORE: "./mssql-restore-database.sh \"$F\""
+      DATA_RESTORE: ""
+      DR_DIAG: ""
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

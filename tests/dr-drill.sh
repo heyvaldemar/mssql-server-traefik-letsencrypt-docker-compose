@@ -77,7 +77,8 @@ sql() {  # one statement against the application's database, from the backups co
 mark_write() {
   case "$DB_ENGINE" in
     mongo) sql "db.dr_marker.deleteMany({}); db.dr_marker.insertOne({v: '$MARK'});" > /dev/null ;;
-    mssql) sql "IF DB_ID(N'$(val "$DB_NAME_ENV")') IS NULL CREATE DATABASE [$(val "$DB_NAME_ENV")];" > /dev/null || true
+    mssql) # the drill's own database, made from master: a connection to a database that is not there yet cannot create it
+           bk "/opt/mssql-tools18/bin/sqlcmd -S '$DB_HOST' -U sa -P $(pass_expr) -C -b -d master -Q \"IF DB_ID(N'$(val "$DB_NAME_ENV")') IS NULL CREATE DATABASE [$(val "$DB_NAME_ENV")];\"" > /dev/null
            sql "IF OBJECT_ID('dr_marker') IS NULL CREATE TABLE dr_marker (v varchar(80)); DELETE FROM dr_marker; INSERT INTO dr_marker VALUES ('$MARK');" > /dev/null ;;
     *) sql "CREATE TABLE IF NOT EXISTS dr_marker (v varchar(80)); DELETE FROM dr_marker; INSERT INTO dr_marker VALUES ('$MARK');" > /dev/null ;;
   esac
