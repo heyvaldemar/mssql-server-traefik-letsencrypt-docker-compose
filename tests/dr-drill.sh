@@ -35,6 +35,10 @@
 #   DB_RESTORE       the shipped command, with "$F" for the dump's file name
 #                    and "$S" for the cycle stamp in it
 #   DATA_RESTORE     the same for the data archive (optional)
+#   DR_IGNORE_SERVICES  services whose state does not count (a Beszel agent
+#                    with no key restarts by design; CI ignores it too)
+#   DR_KEEP          paths an operator keeps off the host besides .env, such
+#                    as Authelia's secret files, carried to the clean machine
 #   DR_FROM          the release the backup is taken on (before only)
 #   DR_DIAG          optional: a command whose output explains a failed answer
 set -Eeuo pipefail
@@ -110,7 +114,7 @@ wait_healthy() {  # every container running and healthy, or a one-shot that exit
   local file="$1" bad=""
   for _ in $(seq 1 90); do
     bad="$(docker compose -f "$file" -p "$PROJECT" ps -a --format json \
-      | jq -rs '[.[] | select((.State == "running" and (.Health == "" or .Health == "healthy")) or (.State == "exited" and .ExitCode == 0) | not)] | map("\(.Service):\(.State)/\(.Health)") | join(" ")')"
+      | jq -rs --arg ignore " ${DR_IGNORE_SERVICES:-} " '[.[] | . as $c | select(($ignore | contains(" " + $c.Service + " ")) | not) | select((.State == "running" and (.Health == "" or .Health == "healthy")) or (.State == "exited" and .ExitCode == 0) | not)] | map("\(.Service):\(.State)/\(.Health)") | join(" ")')"
     [ -z "$bad" ] && return 0
     sleep 10
   done
@@ -196,6 +200,11 @@ before() {
     mkdir -p "$OUT/$v"
     docker cp "$(cid backups):$dir/." "$OUT/$v/"
   done
+  local k
+  for k in ${DR_KEEP:-}; do
+    mkdir -p "$OUT/keep/$(dirname "$k")"
+    cp -a "$k" "$OUT/keep/$k"
+  done
   printf '%s\n' "$MARK" > "$OUT/marker"
   printf '%s\n' "$DR_FROM" > "$OUT/from"
   du -sh "$OUT"
@@ -210,6 +219,10 @@ after() {
   if [ -z "$to" ] || ! git diff --quiet "$to" HEAD -- "$DOCKER_COMPOSE_FILE"; then to="main"; fi
   MARK="$(cat "$OUT/marker")"
   cp "$OUT/env" .env
+  local k
+  for k in ${DR_KEEP:-}; do
+    rm -rf "$k"; mkdir -p "$(dirname "$k")"; cp -a "$OUT/keep/$k" "$k"
+  done
   # THE NEW HOST'S BACKUP LOOP STARTS WITH THE STACK. With CI's 15-second
   # warm-up its first cycle wrote an empty backup into the same directory
   # before the restore ran, the drill restored "the newest file", which was
