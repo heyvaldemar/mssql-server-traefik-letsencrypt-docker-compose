@@ -131,7 +131,7 @@ wait_backup_started_after() {  # directory variable, file regex, marker minute, 
   local dir pat f waited=0
   dir="$(env_of "$1")"; pat="$(expand "$2")"
   while [ "$waited" -lt 900 ]; do
-    for f in $(bk "ls -1 '$dir'" | grep -E "$pat" | sort -r); do
+    for f in $(bk "ls -1 '$dir'" | grep -E -e "$pat" | sort -r); do
       [ "$(printf '%s' "$f" | cycle_of)" \> "$3" ] || continue
       if docker logs "$(cid backups)" 2>&1 | grep -qiF "backup OK: $dir/$f"; then
         say "backup started after the markers: $f"; return 0
@@ -145,7 +145,7 @@ wait_backup_started_after() {  # directory variable, file regex, marker minute, 
 
 newest() {  # the newest exported file matching a pattern, by name: the names carry the time
   local pat; pat="$(expand "$2")"
-  find "$OUT/$1" -maxdepth 1 -type f -printf '%f\n' | grep -E "$pat" | sort | tail -n 1
+  find "$OUT/$1" -maxdepth 1 -type f -printf '%f\n' | grep -E -e "$pat" | sort | tail -n 1
 }
 
 explain() {  # what a failed restore looks like from the inside
