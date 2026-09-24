@@ -167,6 +167,13 @@ before() {
   # Keycloak's deploy job carries the production 30m/24h, and a drill that
   # waits a day for its first backup is not a drill.
   sed -i -E 's/^([A-Z_]*BACKUP_INIT_SLEEP)=.*/\1=15s/; s/^([A-Z_]*BACKUP_INTERVAL)=.*/\1=60s/' .env
+  # An .env that never names the interval leaves the compose default of a day;
+  # every prefix the compose file gives the two variables is set here.
+  local p
+  for p in $(grep -oE '\$\{[A-Z_]*BACKUP_INIT_SLEEP' "$DOCKER_COMPOSE_FILE" | sed 's/^\${//; s/BACKUP_INIT_SLEEP$//' | sort -u); do
+    grep -q "^${p}BACKUP_INIT_SLEEP=" .env || echo "${p}BACKUP_INIT_SLEEP=15s" >> .env
+    grep -q "^${p}BACKUP_INTERVAL=" .env || echo "${p}BACKUP_INTERVAL=60s" >> .env
+  done
   git show "$DR_FROM:$DOCKER_COMPOSE_FILE" > "$from_file"
   say "starting $DR_FROM, the release this host was running"
   docker compose -f "$from_file" -p "$PROJECT" up -d
