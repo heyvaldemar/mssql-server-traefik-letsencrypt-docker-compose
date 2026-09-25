@@ -1,6 +1,7 @@
 # Microsoft SQL Server + Traefik + Let's Encrypt on Docker Compose
 
 [![Deployment Verification](https://github.com/heyvaldemar/mssql-server-traefik-letsencrypt-docker-compose/actions/workflows/deployment-verification.yml/badge.svg?branch=main)](https://github.com/heyvaldemar/mssql-server-traefik-letsencrypt-docker-compose/actions/workflows/deployment-verification.yml)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/14846/badge)](https://www.bestpractices.dev/projects/14846)
 
 This repository deploys Microsoft SQL Server 2022 behind Traefik, with SQL traffic routed through a dedicated TCP entrypoint on port 1433 and the Traefik dashboard served over automatic Let's Encrypt TLS.
 
