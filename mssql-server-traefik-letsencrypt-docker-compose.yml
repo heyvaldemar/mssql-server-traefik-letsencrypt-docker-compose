@@ -207,7 +207,8 @@ services:
     entrypoint: ["/bin/bash", "-c"]
     # Every cycle: BACKUP DATABASE for master, msdb, and every online user
     # database (WITH CHECKSUM - no COMPRESSION, which Express does not
-    # support), then RESTORE VERIFYONLY proves each file is restorable.
+    # support) to a .partial name, then RESTORE VERIFYONLY proves each file
+    # is restorable before it takes its final name.
     # Logs 'Database backup OK'/'FAILED' per database; a failed file is kept
     # as .failed for diagnosis. Retention 0 disables pruning.
     command:
@@ -225,12 +226,13 @@ services:
           for db in $$DBS; do
             FILE="$$MSSQL_BACKUPS_PATH/$$MSSQL_BACKUP_NAME-$$db-$$STAMP.bak"
             echo "[$$(date -Iseconds)] Starting database backup of [$$db] to $$FILE"
-            if sql -Q "BACKUP DATABASE [$$db] TO DISK = N'$$FILE' WITH INIT, FORMAT, CHECKSUM" > /dev/null \
-               && sql -Q "RESTORE VERIFYONLY FROM DISK = N'$$FILE' WITH CHECKSUM" > /dev/null; then
+            if sql -Q "BACKUP DATABASE [$$db] TO DISK = N'$$FILE.partial' WITH INIT, FORMAT, CHECKSUM" > /dev/null \
+               && sql -Q "RESTORE VERIFYONLY FROM DISK = N'$$FILE.partial' WITH CHECKSUM" > /dev/null; then
+              mv "$$FILE.partial" "$$FILE";
               echo "[$$(date -Iseconds)] Database backup OK: $$FILE ($$(stat -c %s "$$FILE") bytes)"
             else
               echo "[$$(date -Iseconds)] Database backup FAILED - partial file kept as $$FILE.failed for diagnosis" >&2
-              mv "$$FILE" "$$FILE.failed" 2>/dev/null || true
+              mv "$$FILE.partial" "$$FILE.failed" 2>/dev/null || true
             fi
           done
           if [ "$${MSSQL_BACKUP_PRUNE_DAYS:-0}" -ge 1 ]; then

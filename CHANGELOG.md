@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_(no unreleased changes yet)_
+### Fixed
+
+- **A database backup takes its final name only once SQL Server has verified it.** `BACKUP DATABASE` wrote straight to the `.bak` name, so until `RESTORE VERIFYONLY` finished, an unverified file sat under the name a restore and the pruning read. It now writes `.bak.partial`, verifies that, and renames it; a file that fails is kept as `.failed`, as before. Found when the fleet's conformance check, which had not been reading this repository's backup loop, was widened to see `sqlcmd`.
 
 ## [1.7.3] - 2026-10-16
 
