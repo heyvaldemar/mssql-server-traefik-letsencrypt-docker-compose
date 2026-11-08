@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_(no unreleased changes yet)_
+
+## [1.7.12] - 2026-11-08
+
 ### Security
 
 - **The SA password is no longer on any command line.** `sqlcmd` took it as `-P "$MSSQL_SA_PASSWORD"` in the backup loop, in `mssql-restore-database.sh`, and in the `mssql` health check, which runs every few seconds for as long as the server is up. A process's arguments are readable by every user on the host with `ps` (`/proc/<pid>/cmdline` is world-readable, and the host sees every container's processes). `sqlcmd` now reads `SQLCMDPASSWORD` from its environment, set inside the container; the README's query example does the same. Verified on the pinned `mcr.microsoft.com/mssql/server:2022-CU27-ubuntu-22.04`: the bundled `/opt/mssql-tools18/bin/sqlcmd` reads the variable (a wrong value is refused with "Login failed for user 'sa'"). CI proves it on every run: the backup of a database big enough to take seconds is read while it runs, on the runner and in the backups container, and a sampler reads every command line on the runner for the whole suite; neither may contain the password, compared through a file so the value is never printed.
@@ -270,7 +274,8 @@ in [keycloak-traefik-letsencrypt-docker-compose](https://github.com/heyvaldemar/
   engine healthcheck, and queries through the Traefik TCP entrypoint.
 - `.env.example` with generation commands; `.gitignore` for `.env`.
 
-[Unreleased]: https://github.com/heyvaldemar/mssql-server-traefik-letsencrypt-docker-compose/compare/v1.7.11...HEAD
+[Unreleased]: https://github.com/heyvaldemar/mssql-server-traefik-letsencrypt-docker-compose/compare/v1.7.12...HEAD
+[1.7.12]: https://github.com/heyvaldemar/mssql-server-traefik-letsencrypt-docker-compose/compare/v1.7.11...v1.7.12
 [1.7.11]: https://github.com/heyvaldemar/mssql-server-traefik-letsencrypt-docker-compose/compare/v1.7.10...v1.7.11
 [1.7.10]: https://github.com/heyvaldemar/mssql-server-traefik-letsencrypt-docker-compose/compare/v1.7.9...v1.7.10
 [1.7.9]: https://github.com/heyvaldemar/mssql-server-traefik-letsencrypt-docker-compose/compare/v1.7.8...v1.7.9
