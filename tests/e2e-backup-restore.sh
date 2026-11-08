@@ -91,11 +91,11 @@ backups_sh() {
 # sqlcmd from the backups container against the server; the password comes
 # from the container environment, never from this shell.
 sql() {
-  docker exec "$BACKUPS_CONTAINER" sh -c '/opt/mssql-tools18/bin/sqlcmd -S mssql -U sa -P "$MSSQL_SA_PASSWORD" -C -b -h -1 -W -Q "$1" | tr -d "\r"' _ "$1"
+  docker exec "$BACKUPS_CONTAINER" sh -c 'SQLCMDPASSWORD="$MSSQL_SA_PASSWORD" /opt/mssql-tools18/bin/sqlcmd -S mssql -U sa -C -b -h -1 -W -Q "$1" | tr -d "\r"' _ "$1"
 }
 
 db_ready() {
-  docker exec "$BACKUPS_CONTAINER" sh -c '/opt/mssql-tools18/bin/sqlcmd -S mssql -U sa -P "$MSSQL_SA_PASSWORD" -C -b -Q "SELECT 1"' > /dev/null 2>&1
+  docker exec "$BACKUPS_CONTAINER" sh -c 'SQLCMDPASSWORD="$MSSQL_SA_PASSWORD" /opt/mssql-tools18/bin/sqlcmd -S mssql -U sa -C -b -Q "SELECT 1"' > /dev/null 2>&1
 }
 
 wait_for_db_ready() {
@@ -219,6 +219,95 @@ test_prune_removes_old() {
   [[ -n "$(list_backups)" ]] || { fail "prune removed everything, including recent backups"; return 1; }
 }
 
+# --- No password on any command line ---
+#
+# A process's arguments are /proc/<pid>/cmdline, mode 0444: every user on the
+# host reads them with ps, and the host sees every container's processes. Its
+# environment is /proc/<pid>/environ, readable by its owner alone. So sqlcmd
+# reads SQLCMDPASSWORD, never -P. Two proofs, both matched against a file
+# holding the value, so the value is never printed and never becomes an
+# argument of the comparison itself:
+#   - a sampler reads every command line on this machine several times a
+#     second for the whole suite;
+#   - the backup of a database big enough to take seconds is read while it
+#     runs, on the host and inside the backups container.
+DB_PASS="${MSSQL_SA_PASSWORD:?set in .env}"
+PW_FILE="$(mktemp)"; PS_COUNTS="$(mktemp)"; PS_SAMPLER=""
+trap 'rm -f "$PW_FILE" "$PS_COUNTS"; [[ -z "$PS_SAMPLER" ]] || kill "$PS_SAMPLER" 2>/dev/null || true' EXIT
+chmod 600 "$PW_FILE"; printf '%s\n' "$DB_PASS" > "$PW_FILE"
+PW_SUM="sha256:$(printf '%s' "$DB_PASS" | sha256sum | cut -c1-12)"   # names the value in this log without showing it
+PROBE_DB="zz_argv_probe"
+
+argv_hits() { grep -cF -f "$PW_FILE" || true; }                 # lines on stdin that contain the value
+cmdlines_in() {                                                   # every command line inside one container
+  docker exec "$1" sh -c 'for f in /proc/[0-9]*/cmdline; do tr "\000" " " < "$f" 2>/dev/null; echo; done'
+}
+seconds_of() {
+  case "$1" in
+    *h) echo $(( ${1%h} * 3600 )) ;;
+    *m) echo $(( ${1%m} * 60 )) ;;
+    *s) echo "${1%s}" ;;
+    *) echo "$1" ;;
+  esac
+}
+ps_sampler_start() {
+  ( while :; do ps -eo args= 2>/dev/null | argv_hits >> "$PS_COUNTS"; sleep 0.2; done ) &
+  PS_SAMPLER=$!
+}
+ps_sampler_stop() {
+  [[ -n "$PS_SAMPLER" ]] || return 0
+  kill "$PS_SAMPLER" 2>/dev/null || true; wait "$PS_SAMPLER" 2>/dev/null || true; PS_SAMPLER=""
+}
+
+test_backup_runs_without_password_in_argv() {
+  # 20,000 rows of 8 KB: BACKUP ... WITH CHECKSUM and RESTORE VERIFYONLY of it
+  # take seconds, long enough to read the sqlcmd process that asked for them.
+  local init since cmd="" i ok="" hits_host hits_bkp
+  init=$(seconds_of "${MSSQL_BACKUP_INIT_SLEEP:-30m}")
+  [[ "$init" -le 120 ]] || { fail "MSSQL_BACKUP_INIT_SLEEP is ${MSSQL_BACKUP_INIT_SLEEP:-30m}; this test needs a short one (CI uses 15s)"; return 1; }
+  if ! { sql "IF DB_ID('$PROBE_DB') IS NULL CREATE DATABASE [$PROBE_DB];" > /dev/null \
+         && sql "ALTER DATABASE [$PROBE_DB] SET AUTO_CLOSE OFF;" > /dev/null \
+         && sql "SET NOCOUNT ON; IF OBJECT_ID('[$PROBE_DB].dbo.filler') IS NULL BEGIN CREATE TABLE [$PROBE_DB].dbo.filler (c char(8000)); INSERT INTO [$PROBE_DB].dbo.filler SELECT TOP 20000 'x' FROM sys.all_objects a CROSS JOIN sys.all_objects b; END" > /dev/null; }; then
+    fail "could not create the probe database"; return 1
+  fi
+  since="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  echo "  restarting the backups service; its cycle ends with the probe database"
+  docker restart "$BACKUPS_CONTAINER" > /dev/null
+  for (( i = 0; i < (init + 180) * 10; i++ )); do
+    cmd="$(ps -eo comm=,args= | awk -v db="$PROBE_DB" '$1 == "sqlcmd" && index($0, db) { $1 = ""; sub(/^ /, ""); print; exit }')"
+    [[ -n "$cmd" ]] && break
+    sleep 0.1
+  done
+  hits_host=$(ps -eo args= | argv_hits)
+  hits_bkp=$(cmdlines_in "$BACKUPS_CONTAINER" | argv_hits)
+  for (( i = 0; i < 180; i += 3 )); do
+    ok="$(docker logs --since "$since" "$BACKUPS_CONTAINER" 2>&1 | grep -E "Database backup (OK|FAILED).*$PROBE_DB" | head -n 1 || true)"
+    [[ -n "$ok" ]] && break
+    sleep 3
+  done
+  sql "IF DB_ID('$PROBE_DB') IS NOT NULL DROP DATABASE [$PROBE_DB];" > /dev/null 2>&1 || true
+  backups_sh "rm -f ${BACKUPS_PATH}/${BACKUP_PREFIX}-${PROBE_DB}-*" || true
+  [[ -n "$cmd" ]] || { fail "no sqlcmd for $PROBE_DB appeared within $(( init + 180 ))s of the restart"; return 1; }
+  echo "  sqlcmd, read while it ran: $(sed -E 's/(^| )-P [^ ]*/\1-P <hidden>/g' <<< "$cmd" | cut -c1-200)"
+  [[ "$hits_host" == 0 ]] || { fail "$hits_host command line(s) on the host carried the password ($PW_SUM) during the backup"; return 1; }
+  [[ "$hits_bkp" == 0 ]] || { fail "$hits_bkp command line(s) in the backups container carried the password ($PW_SUM) during the backup"; return 1; }
+  if grep -qE '(^| )-P( |$)' <<< "$cmd"; then
+    fail "sqlcmd was given its password as -P"; return 1
+  fi
+  [[ "$ok" == *"backup OK"* ]] || { fail "the backup of $PROBE_DB did not finish OK: ${ok:-no result within 180s}"; return 1; }
+  echo "  0 command lines on the host and 0 in the backups container carried the password ($PW_SUM); the backup finished OK"
+}
+
+test_no_password_on_any_command_line() {
+  ps_sampler_stop
+  local samples hits
+  samples=$(wc -l < "$PS_COUNTS" | tr -d '[:space:]')
+  hits=$(awk '$1 > 0 { n++ } END { print n + 0 }' "$PS_COUNTS")
+  [[ "$samples" -ge 100 ]] || { fail "only $samples samples of the host's command lines were taken"; return 1; }
+  [[ "$hits" == 0 ]] || { fail "$hits of $samples samples of the host's command lines carried the password ($PW_SUM)"; return 1; }
+  echo "  $samples samples of every command line on the host during this suite, none with the password ($PW_SUM)"
+}
+
 # --- Main ---
 
 echo "=== SQL Server: backup/restore E2E tests ==="
@@ -236,12 +325,15 @@ sql "ALTER DATABASE [$TEST_DB] SET AUTO_CLOSE OFF;" > /dev/null
 sql "IF OBJECT_ID('[$TEST_DB].dbo.e2e_marker') IS NULL CREATE TABLE [$TEST_DB].dbo.e2e_marker (id int PRIMARY KEY);" > /dev/null
 backups_sh "touch ${BACKUPS_PATH}/.e2e-marker-stamp"
 
+ps_sampler_start
 run_test test_env_required
 run_test test_backup_created
 run_test test_backup_verifyonly
 run_test test_backup_failure_detected
 run_test test_restore_roundtrip
 run_test test_prune_removes_old
+run_test test_backup_runs_without_password_in_argv
+run_test test_no_password_on_any_command_line
 
 echo
 echo "==============================="

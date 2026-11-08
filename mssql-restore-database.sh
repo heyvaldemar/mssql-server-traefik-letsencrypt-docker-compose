@@ -28,7 +28,9 @@ BACKUP_PATH="$(docker exec "$MSSQL_BACKUPS_CONTAINER" printenv MSSQL_BACKUPS_PAT
 BACKUP_NAME="$(docker exec "$MSSQL_BACKUPS_CONTAINER" printenv MSSQL_BACKUP_NAME)"
 
 sql() {
-  docker exec "$MSSQL_BACKUPS_CONTAINER" sh -c '/opt/mssql-tools18/bin/sqlcmd -S mssql -U sa -P "$MSSQL_SA_PASSWORD" -C -b -Q "$1"' _ "$1"
+  # SQLCMDPASSWORD, set inside the container, never -P: an argument is readable
+  # by every user on this host for as long as the command runs.
+  docker exec "$MSSQL_BACKUPS_CONTAINER" sh -c 'SQLCMDPASSWORD="$MSSQL_SA_PASSWORD" /opt/mssql-tools18/bin/sqlcmd -S mssql -U sa -C -b -Q "$1"' _ "$1"
 }
 
 SELECTED_DATABASE_BACKUP="${1:-}"

@@ -229,7 +229,7 @@ jobs:
         # that the shipped configuration promises.
         run: |
           docker compose -f mssql-server-traefik-letsencrypt-docker-compose.yml -p mssql exec -T mssql \
-            /bin/sh -c '/opt/mssql-tools18/bin/sqlcmd -S traefik,1433 -U sa -P "$MSSQL_SA_PASSWORD" -C -b -Q "SELECT @@VERSION"'
+            /bin/sh -c 'SQLCMDPASSWORD="$MSSQL_SA_PASSWORD" /opt/mssql-tools18/bin/sqlcmd -S traefik,1433 -U sa -C -b -Q "SELECT @@VERSION"'
 
       - name: Verify a backup is produced and valid
         # Log-driven: the file named in a 'backup OK' line is complete by
@@ -239,7 +239,7 @@ jobs:
           timeout 6m bash -c 'until docker compose -f "$DOCKER_COMPOSE_FILE" -p "$COMPOSE_PROJECT_NAME" logs backups 2>/dev/null | grep -q "Database backup OK"; do echo "Waiting for the first backup cycle..."; sleep 10; done'
           docker compose -f "$DOCKER_COMPOSE_FILE" -p "$COMPOSE_PROJECT_NAME" logs backups 2>/dev/null | grep "Database backup OK" | cut -c1-160
           f=$(docker compose -f "$DOCKER_COMPOSE_FILE" -p "$COMPOSE_PROJECT_NAME" logs backups 2>/dev/null | grep "Database backup OK" | tail -1 | sed -E 's/.*Database backup OK: ([^ ]+) .*/\1/')
-          docker compose -f "$DOCKER_COMPOSE_FILE" -p "$COMPOSE_PROJECT_NAME" exec -T backups sh -c "/opt/mssql-tools18/bin/sqlcmd -S mssql -U sa -P \"\$MSSQL_SA_PASSWORD\" -C -b -Q \"RESTORE VERIFYONLY FROM DISK = N'$f' WITH CHECKSUM\"" && echo "Backup verified restorable: $f"
+          docker compose -f "$DOCKER_COMPOSE_FILE" -p "$COMPOSE_PROJECT_NAME" exec -T backups sh -c "SQLCMDPASSWORD=\"\$MSSQL_SA_PASSWORD\" /opt/mssql-tools18/bin/sqlcmd -S mssql -U sa -C -b -Q \"RESTORE VERIFYONLY FROM DISK = N'$f' WITH CHECKSUM\"" && echo "Backup verified restorable: $f"
           docker compose -f "$DOCKER_COMPOSE_FILE" -p "$COMPOSE_PROJECT_NAME" logs backups 2>/dev/null | grep -i "backup FAILED" && { echo "::error::the backups log reports a failure"; exit 1; } || true
 
       - name: Run the backup/restore end-to-end tests

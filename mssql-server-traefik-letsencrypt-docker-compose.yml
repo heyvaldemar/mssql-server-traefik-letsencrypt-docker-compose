@@ -52,7 +52,7 @@ services:
       # the service environment at runtime, never baked into the config.
       # sqlcmd lives under mssql-tools18 in current images; -C trusts the
       # instance's self-signed certificate for the local loopback check.
-      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -b -Q 'SELECT 1' || exit 1"]
+      test: ["CMD-SHELL", "SQLCMDPASSWORD=\"$$MSSQL_SA_PASSWORD\" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -b -Q 'SELECT 1' || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -214,7 +214,9 @@ services:
     command:
       - |
         set -o pipefail
-        sql() { /opt/mssql-tools18/bin/sqlcmd -S mssql -U sa -P "$$MSSQL_SA_PASSWORD" -C -b "$$@"; }
+        # SQLCMDPASSWORD, never -P: every user on the host reads a command line
+        # with ps; the environment stays with the process.
+        sql() { SQLCMDPASSWORD="$$MSSQL_SA_PASSWORD" /opt/mssql-tools18/bin/sqlcmd -S mssql -U sa -C -b "$$@"; }
         chown 10001:0 "$$MSSQL_BACKUPS_PATH" && chmod 770 "$$MSSQL_BACKUPS_PATH"
         sleep "$$MSSQL_BACKUP_INIT_SLEEP"
         while true; do

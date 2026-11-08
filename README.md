@@ -38,7 +38,7 @@ docker compose -f mssql-server-traefik-letsencrypt-docker-compose.yml -p mssql p
 
 # Query through the published port (uses sqlcmd from inside the container):
 docker compose -f mssql-server-traefik-letsencrypt-docker-compose.yml -p mssql exec mssql \
-  /bin/sh -c '/opt/mssql-tools18/bin/sqlcmd -S traefik,1433 -U sa -P "$MSSQL_SA_PASSWORD" -C -Q "SELECT @@VERSION"'
+  /bin/sh -c 'SQLCMDPASSWORD="$MSSQL_SA_PASSWORD" /opt/mssql-tools18/bin/sqlcmd -S traefik,1433 -U sa -C -Q "SELECT @@VERSION"'
 # Expected: the SQL Server 2022 version banner
 ```
 
