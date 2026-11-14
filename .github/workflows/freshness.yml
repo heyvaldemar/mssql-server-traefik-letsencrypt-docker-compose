@@ -114,6 +114,14 @@ jobs:
         # deliver that via git pull. The freshness gate tracks cumulative
         # updates within the pinned release line only; the yearly line is
         # bumped deliberately in a major release of this template.
+        #
+        # A SECURITY UPDATE ON A CU IS NEWER THAN THE CU. Microsoft ships its
+        # monthly security fixes as GDR builds on the current CU, tagged
+        # <line>-CU<n>-GDR<m>-ubuntu-<u>. This step used to match CU tags
+        # only, so 2022-CU27-GDR1 (13 October 2026) and 2022-CU27-GDR2
+        # (10 November 2026) never showed up, and the template stayed on the
+        # base CU27 build without those fixes until CU28 arrived. Tags are
+        # now ordered by CU and then by GDR, with no GDR counted as 0.
         run: |
           pin="$(grep -m1 -oE '\$\{MSSQL_IMAGE_TAG:-.*' mssql-server-traefik-letsencrypt-docker-compose.yml | sed -E -e ':a' -e 's/\$\{[A-Z0-9_]+:-([^{}]*)\}/\1/' -e 'ta')"
           ref="${pin%%@*}"
@@ -121,8 +129,12 @@ jobs:
           line="${pinned_tag%%-*}"
           ubuntu="${pinned_tag#*-ubuntu-}"
           latest="$(curl -fsSL --retry 3 https://mcr.microsoft.com/v2/mssql/server/tags/list \
-            | jq -r --arg l "$line" --arg u "$ubuntu" '.tags[] | select(test("^" + $l + "-CU[0-9]+-ubuntu-" + $u + "$"))' \
-            | sort -t U -k2 -n | tail -1)"
+            | jq -r --arg l "$line" --arg u "$ubuntu" '
+                [.tags[]
+                 | . as $t
+                 | capture("^" + $l + "-CU(?<cu>[0-9]+)(-GDR(?<gdr>[0-9]+))?-ubuntu-" + $u + "$")
+                 | {t: $t, k: [(.cu | tonumber), ((.gdr // "0") | tonumber)]}]
+                | sort_by(.k) | last | .t // empty')"
           if [ -z "$latest" ]; then
             echo "::error::Could not determine the latest SQL Server ${line} CU tag from mcr.microsoft.com"
             exit 1
@@ -131,7 +143,7 @@ jobs:
             echo "::error::SQL Server pin is behind: pinned ${pinned_tag}, latest tag is ${latest}"
             exit 1
           fi
-          echo "SQL Server pin ${pinned_tag} is the newest CU in the ${line} line"
+          echo "SQL Server pin ${pinned_tag} is the newest CU or security update in the ${line} line"
 
       - name: Compare pinned Traefik minor against the latest release
         # Runs even when the digest comparison above failed, so one run

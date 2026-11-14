@@ -7,9 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
+### Security
 
-- **`mcr.microsoft.com/mssql/server:2022-CU27-ubuntu-22.04` moved to `mcr.microsoft.com/mssql/server:2022-CU28-ubuntu-22.04`.** The freshness check reported the lag; the deploy job booted the stack on the new image before this landed.
+- **SQL Server 2022 CU28, and with it the two security updates this template
+  missed on CU27.** CU28 is build 16.0.4325.4, KB5125472, released 12 November
+  2026, and the image's own `com.microsoft.version` label reads the same build.
+  Before it, Microsoft shipped two security updates on CU27: KB5126934 on
+  13 October (build 16.0.4305.5) and KB5129300 on 10 November (build
+  16.0.4315.2), tagged `2022-CU27-GDR1-ubuntu-22.04` and
+  `2022-CU27-GDR2-ubuntu-22.04`. This template never took either, because the
+  freshness check read CU tags only (see Fixed). Their advisories include remote
+  code execution and elevation of privilege. CU28 is a later build than both,
+  and its own fix list covers the same ground under new bug numbers: the
+  out-of-bounds write and read in backup and restore through the Virtual Device
+  Interface, the out-of-bounds read on client connection requests, corrupted
+  row-compressed records that returned memory content, and a run of
+  replication fixes.
+
+  Of CU28's 91 fixes, 37 apply on Linux and 54 are Windows only. Its one known
+  issue is `SESSION_CONTEXT` in parallel plans, which can return wrong results
+  or write access-violation dumps; nothing in this template calls it. The
+  container user, entrypoint and command are the same as CU27's, no variable
+  this template sets changes, and the line stays 2022.
+
+  A database engine update is still a database engine update: take a backup
+  before pulling it on a live deployment.
+
+### Fixed
+
+- **The freshness check sees Microsoft's security updates.** It compared the
+  pin only with `<line>-CU<n>-ubuntu-<u>` tags, so a security update shipped on
+  the current CU as `<line>-CU<n>-GDR<m>-ubuntu-<u>` never counted as newer,
+  and the pin stayed on the base CU27 build for a month while two of them came
+  out. Tags are now ordered by CU and then by GDR, with no GDR counted as 0, so
+  the next security update raises the same alarm a new CU does.
 
 ## [1.7.14] - 2026-11-14
 
