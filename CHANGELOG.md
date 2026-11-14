@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_(no unreleased changes yet)_
+### Changed
+
+- **`mcr.microsoft.com/mssql/server:2022-CU27-ubuntu-22.04` moved to `mcr.microsoft.com/mssql/server:2022-CU28-ubuntu-22.04`.** The freshness check reported the lag; the deploy job booted the stack on the new image before this landed.
 
 ## [1.7.14] - 2026-11-14
 
