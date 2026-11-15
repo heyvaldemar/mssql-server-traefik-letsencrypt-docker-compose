@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_(no unreleased changes yet)_
+
+## [1.7.15] - 2026-11-15
+
 ### Security
 
 - **This template ran SQL Server 2022 CU27 without two security updates, and
@@ -326,7 +330,8 @@ in [keycloak-traefik-letsencrypt-docker-compose](https://github.com/heyvaldemar/
   engine healthcheck, and queries through the Traefik TCP entrypoint.
 - `.env.example` with generation commands; `.gitignore` for `.env`.
 
-[Unreleased]: https://github.com/heyvaldemar/mssql-server-traefik-letsencrypt-docker-compose/compare/v1.7.14...HEAD
+[Unreleased]: https://github.com/heyvaldemar/mssql-server-traefik-letsencrypt-docker-compose/compare/v1.7.15...HEAD
+[1.7.15]: https://github.com/heyvaldemar/mssql-server-traefik-letsencrypt-docker-compose/compare/v1.7.14...v1.7.15
 [1.7.14]: https://github.com/heyvaldemar/mssql-server-traefik-letsencrypt-docker-compose/compare/v1.7.13...v1.7.14
 [1.7.13]: https://github.com/heyvaldemar/mssql-server-traefik-letsencrypt-docker-compose/compare/v1.7.12...v1.7.13
 [1.7.12]: https://github.com/heyvaldemar/mssql-server-traefik-letsencrypt-docker-compose/compare/v1.7.11...v1.7.12
