@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_(no unreleased changes yet)_
+
+## [1.7.16] - 2026-11-24
+
 ### Security
 
 - **`traefik:3.7` was rebuilt upstream**; the pin moved from `sha256:b7b1b31e6440…` to `sha256:649c6476d4c4…`. Same version, same tag, a rebuilt base image — the usual shape of a security fix in a base layer.
@@ -332,7 +336,8 @@ in [keycloak-traefik-letsencrypt-docker-compose](https://github.com/heyvaldemar/
   engine healthcheck, and queries through the Traefik TCP entrypoint.
 - `.env.example` with generation commands; `.gitignore` for `.env`.
 
-[Unreleased]: https://github.com/heyvaldemar/mssql-server-traefik-letsencrypt-docker-compose/compare/v1.7.15...HEAD
+[Unreleased]: https://github.com/heyvaldemar/mssql-server-traefik-letsencrypt-docker-compose/compare/v1.7.16...HEAD
+[1.7.16]: https://github.com/heyvaldemar/mssql-server-traefik-letsencrypt-docker-compose/compare/v1.7.15...v1.7.16
 [1.7.15]: https://github.com/heyvaldemar/mssql-server-traefik-letsencrypt-docker-compose/compare/v1.7.14...v1.7.15
 [1.7.14]: https://github.com/heyvaldemar/mssql-server-traefik-letsencrypt-docker-compose/compare/v1.7.13...v1.7.14
 [1.7.13]: https://github.com/heyvaldemar/mssql-server-traefik-letsencrypt-docker-compose/compare/v1.7.12...v1.7.13
